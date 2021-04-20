@@ -1,0 +1,148 @@
+version: "3"
+networks:
+  rockethouse-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.167.0.0/25
+services:  
+  localstack:         
+     image: localstack/localstack
+     container_name: localstack
+     ports:
+       - "4566-4599:4566-4599"
+       - "9000:9000"
+     networks:
+      - rockethouse-network
+     environment:
+       - SERVICES=s3,cloudwatch,eventbridge,sns:4575,sqs:4576,lambda,kinesis,cloudwatch  
+       - DEFAULT_REGION=eu-west-1 
+       - DATA_DIR=/tmp/localstack/data
+       - PORT_WEB_UI=9000
+       - LAMBDA_EXECUTOR=docker #docker-reuse 
+       - DOCKER_HOST=unix:///var/run/docker.sock
+       - START_WEB=1
+       - DEBUG=1
+       - EDGE_PORT=4566
+       - LAMBDA_DOCKER_NETWORK=docker_rockethouse-network
+     links:
+      - postgresql-master  
+     volumes:
+       - "/var/run/docker.sock:/var/run/docker.sock"
+  mail:
+    networks:
+      - rockethouse-network
+    image: mailhog/mailhog:latest
+    ports:
+      - 8025:8025
+  redis:
+    networks:
+      - rockethouse-network
+    image: "redis:alpine"
+    ports:
+      - "6379:6379"
+    container_name: redisdbr
+  postgresql-master:
+    image: 'docker.io/bitnami/postgresql:11-debian-10'
+    ports:
+      - '54320:5432'
+    volumes:
+      - 'postgresql_master_data:/bitnami/postgresql'
+    environment:
+      - POSTGRESQL_REPLICATION_MODE=master
+      - POSTGRESQL_REPLICATION_USER=repl_user
+      - POSTGRESQL_REPLICATION_PASSWORD=repl_password
+      - POSTGRESQL_USERNAME=postgres
+      - POSTGRESQL_PASSWORD=postgres
+      - POSTGRESQL_DATABASE=demo      
+      - ALLOW_EMPTY_PASSWORD=yes
+      - ALLOW_IP_RANGE=0.0.0.0/0
+      - POSTGRES_HOST_AUTH_METHOD=trust
+      - LISTEN_ADDRESSES='*'
+    networks:
+      - rockethouse-network        
+  postgresql-slave:
+    image: 'docker.io/bitnami/postgresql:11-debian-10'
+    ports:
+      - '54321:5432'
+    depends_on:
+      - postgresql-master
+    environment:
+      - POSTGRESQL_REPLICATION_MODE=slave
+      - POSTGRESQL_REPLICATION_USER=repl_user
+      - POSTGRESQL_REPLICATION_PASSWORD=repl_password
+      - POSTGRESQL_MASTER_HOST=postgresql-master
+      - POSTGRESQL_PASSWORD=postgres
+      - POSTGRESQL_MASTER_PORT_NUMBER=5432
+      - ALLOW_EMPTY_PASSWORD=yes 
+    networks:
+      - rockethouse-network  
+  mongo:
+    volumes:
+      - 'data:/data/db'
+    networks:
+      rockethouse-network:
+        ipv4_address: 192.167.0.100
+    image: mongo
+    ports:
+      - 27017:27017
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example    
+  redis-server:
+    container_name: redis-server
+    restart: always
+    build: ../infrastructure/redis
+    networks:
+      - rockethouse-network 
+    volumes:
+      - ../infrastructure/redis:/src    
+    depends_on:
+      - socket-server  
+  socket-server:    
+    container_name: socket
+    restart: always
+    build: ../infrastructure/socket
+    networks:
+      - rockethouse-network 
+    ports:
+      - "3002:3002"
+    volumes:
+      - ../infrastructure/socket:/src
+  gateway:
+    container_name: gateway
+    restart: always
+    build: ../infrastructure/gateway
+    networks:
+      - rockethouse-network
+    volumes:
+      - ../services/orders:/var/task/orders
+      - ../infrastructure/gateway:/var/task
+    depends_on:
+      - mongo
+      - postgresql-master
+      - localstack
+  rails-api:
+    container_name: api
+    restart: always
+    build: ../apps/api
+    ports:
+      - "3000:3000"
+    networks:
+      - rockethouse-network
+    volumes:
+      - ../apps/api:/project
+    links:
+      - mongo:mongo        
+    depends_on:
+      - postgresql-master
+      - mongo  
+      - redis
+    environment:
+      database_host: 'postgresql-master'
+      database_port: '5432'
+volumes:
+  postgresql_master_data:
+    driver: local
+  data:
+    driver: local  

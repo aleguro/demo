@@ -1,0 +1,21 @@
+{
+  "name": "socket",
+  "version": "1.0.0",
+  "description": "",
+  "main": "socket.js",
+  "scripts": {
+    "start": "node /src/socket.js",
+    "dev": "nodemon socket.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.17.1",
+    "redis": "^3.0.2",
+    "socket.io": "^3.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.6"
+  }
+}

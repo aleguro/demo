@@ -1,0 +1,5 @@
+---
+BUNDLE_PATH: "vendor/bundle"
+BUNDLE_BUILD__PG: "--with-pg-include=/usr/include/pgsql92"
+BUNDLE_SILENCE_ROOT_WARNING: "true"
+BUNDLE_CLEAN: "true"

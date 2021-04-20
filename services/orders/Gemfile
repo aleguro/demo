@@ -1,0 +1,10 @@
+source 'https://rubygems.org'
+git_source(:github) { |repo| "https://github.com/#{repo}.git" }
+
+ruby '2.5.8'
+
+gem 'pg'
+gem 'redis'
+gem 'mongoid'
+gem 'activerecord'
+gem 'activesupport'
